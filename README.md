@@ -4,6 +4,13 @@ Ansible role to upgrade Python3 to the latest version (currently 3.10) on Ubuntu
 
 Ubuntu 22.04 LTS is packaged with Python 3.10 by default so no upgrade is required.
 
+This role upgrades Python3 and also **resolves the following issues** after upgrade:
+
+* Issues with apt_pkg and apt_inst.
+* System becoming inaccessible by Ansible.
+* System becoming inaccessible after reboot.
+* System becoming inaccessible by cloud-init to launch a new EC2 instance from an AMI.
+
 ## Requirements
 
 None.
@@ -14,7 +21,7 @@ None.
 |------------------------|--------|
 | python_version_upgrade | "3.10" |
 
-*Note:* The version needs to be in quotes, otherwise Ansible treats it as a float, and 3.10 becomes 3.1 which results in errors.
+**Note:** The version needs to be in quotes, otherwise Ansible treats it as a float, and 3.10 becomes 3.1 which results in errors.
 
 ## Dependencies
 
