@@ -1,0 +1,102 @@
+---
+- name: Get currently installed python version
+  ansible.builtin.shell: python3 -V | cut -d ' ' -f 2 | cut -d '.' -f 1,2
+  register: python_version
+
+- name: Set currently installed python version variable
+  ansible.builtin.set_fact:
+    python_version_installed: "{{ python_version.stdout_lines[0] }}"
+
+- name: Set the python version without dots
+  ansible.builtin.set_fact:
+    python_nodots: "{{ python_version_installed | replace('.', '') }}"
+
+- name: Append m to version 36
+  ansible.builtin.set_fact:
+    python_nodots: "{{ python_nodots }}m"
+  when: python_nodots == "36"
+
+- name: Add deadsnakes ppa repository
+  ansible.builtin.apt_repository:
+    repo: ppa:deadsnakes/ppa
+
+- name: Install new python version
+  ansible.builtin.apt:
+    name: "python{{ python_version_upgrade }}"
+    state: latest
+    update_cache: yes
+
+- name: Fix broken apt_inst after python upgrade
+  ansible.builtin.file:
+    src: "/usr/lib/python3/dist-packages/apt_inst.cpython-{{ python_nodots }}-x86_64-linux-gnu.so"
+    dest: /usr/lib/python3/dist-packages/apt_inst.so
+    state: link
+
+- name: Fix broken apt_pkg after python upgrade
+  ansible.builtin.file:
+    src: "/usr/lib/python3/dist-packages/apt_pkg.cpython-{{ python_nodots }}-x86_64-linux-gnu.so"
+    dest: /usr/lib/python3/dist-packages/apt_pkg.so
+    state: link
+
+- name: Make installed python version an alternative with a priority of 2
+  community.general.alternatives:
+    name: python3
+    path: "/usr/bin/python{{ python_version_installed }}"
+    link: /usr/bin/python3
+    priority: 2
+
+- name: Make upgraded python version an alternative with a priority of 1
+  community.general.alternatives:
+    name: python3
+    path: "/usr/bin/python{{ python_version_upgrade }}"
+    link: /usr/bin/python3
+    priority: 1
+
+- name: Reinstall python3-apt
+  ansible.builtin.shell: >-
+    apt remove -y --purge python3-apt && apt autoclean && apt install -y python3-apt
+
+# This breaks Ansible, so the following fix is required
+- name: Fix apt module
+  ansible.builtin.lineinfile:
+    path: /usr/lib/python3/dist-packages/apt/package.py
+    regexp: "^from collections import Mapping, Sequence"
+    line: from collections.abc import Mapping, Sequence
+
+- name: Install required packages
+  ansible.builtin.apt:
+    name: "{{ item }}"
+  loop:
+    - build-essential
+    - "python{{ python_version_upgrade }}-distutils"
+    - "python{{ python_version_upgrade }}-venv"
+    - "libpython{{ python_version_upgrade }}-dev"
+
+- name: Download latest pip
+  ansible.builtin.get_url:
+    url: https://bootstrap.pypa.io/get-pip.py
+    dest: /tmp/get-pip.py
+    mode: 0755
+
+- name: Install latest pip
+  ansible.builtin.command: >-
+    python3 /tmp/get-pip.py
+
+- name: Upgrade outdated python libraries that break cloud-init
+  ansible.builtin.command: >-
+    pip3 install --upgrade {{ item }}
+  loop:
+    - setuptools
+    - urllib3
+    - requests
+    - jinja2
+    - netifaces
+
+- name: Fix broken pyyaml package in distutils
+  ansible.builtin.command: >-
+    pip3 install --upgrade --ignore-installed pyyaml
+
+- name: Upgrade cloud-init to latest version
+  ansible.builtin.apt:
+    name: cloud-init
+    state: latest
