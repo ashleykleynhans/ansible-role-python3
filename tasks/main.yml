@@ -38,6 +38,18 @@
     dest: /usr/lib/python3/dist-packages/apt_pkg.so
     state: link
 
+- name: Fix broken _dbus_bindings after python upgrade
+  ansible.builtin.file:
+    src: "/usr/lib/python3/dist-packages/_dbus_bindings.cpython-{{ python_nodots }}-x86_64-linux-gnu.so"
+    dest: /usr/lib/python3/dist-packages/_dbus_bindings.so
+    state: link
+
+- name: Fix broken _dbus_glib_bindings after python upgrade
+  ansible.builtin.file:
+    src: "/usr/lib/python3/dist-packages/_dbus_glib_bindings.cpython-{{ python_nodots }}-x86_64-linux-gnu.so"
+    dest: /usr/lib/python3/dist-packages/_dbus_glib_bindings.so
+    state: link
+
 - name: Make installed python version an alternative with a priority of 2
   community.general.alternatives:
     name: python3
